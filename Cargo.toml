@@ -1,0 +1,7 @@
+[package]
+name = "cargo-docserver"
+version = "0.1.0"
+authors = ["Douglas Campos <qmx@qmx.me>"]
+
+[dependencies]
+structopt = "0.2.10"
