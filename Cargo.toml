@@ -5,3 +5,7 @@ authors = ["Douglas Campos <qmx@qmx.me>"]
 
 [dependencies]
 structopt = "0.2.10"
+hyper = "0.12.6"
+futures = "0.1.23"
+tokio-fs = "0.1.2"
+tokio-io = "0.1.7"
