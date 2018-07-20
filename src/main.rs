@@ -10,6 +10,7 @@ extern crate tokio_io;
 use hyper::service::service_fn;
 use hyper::{Body, Method, Request, Response, Server, StatusCode};
 use std::io;
+use std::path::Path;
 use std::str;
 use structopt::StructOpt;
 
@@ -37,12 +38,10 @@ fn serve_docs(req: Request<Body>) -> ResponseFuture {
                 .unwrap(),
         )),
         (&Method::GET, path) => {
-            //let target = manifest.parent().unwrap().join(&"target/doc");
-
             let meta = cargo_metadata::metadata(None).unwrap();
             let package_name = &meta.packages[0].name;
             let package_name_sanitized = str::replace(&package_name, "-", "_");
-            let doc_path = std::path::Path::new(&meta.target_directory)
+            let doc_path = Path::new(&meta.target_directory)
                 .join("doc")
                 .join(package_name_sanitized);
             eprintln!("{:?}, not found", &doc_path);
