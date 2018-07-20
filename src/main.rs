@@ -42,7 +42,9 @@ fn serve_docs(req: Request<Body>) -> ResponseFuture {
             let meta = cargo_metadata::metadata(None).unwrap();
             let package_name = &meta.packages[0].name;
             let package_name_sanitized = str::replace(&package_name, "-", "_");
-            let doc_path = std::path::Path::new(&meta.target_directory).join("doc").join(package_name_sanitized);
+            let doc_path = std::path::Path::new(&meta.target_directory)
+                .join("doc")
+                .join(package_name_sanitized);
             eprintln!("{:?}, not found", &doc_path);
 
             Box::new(
