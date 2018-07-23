@@ -5,12 +5,13 @@ extern crate cargo_metadata;
 extern crate hyper;
 
 extern crate futures;
+extern crate mime_guess;
 extern crate tokio_fs;
 extern crate tokio_io;
 use hyper::service::service_fn;
 use hyper::{Body, Method, Request, Response, Server, StatusCode};
 use std::io;
-use std::path::{Path,PathBuf};
+use std::path::{Path, PathBuf};
 use std::str;
 use structopt::StructOpt;
 
@@ -39,8 +40,7 @@ impl CrateInfo {
         let meta = cargo_metadata::metadata(None).unwrap();
         let package_name = &meta.packages[0].name;
         let package_name_sanitized = str::replace(&package_name, "-", "_");
-        let doc_path = Path::new(&meta.target_directory)
-            .join("doc");
+        let doc_path = Path::new(&meta.target_directory).join("doc");
         CrateInfo {
             name: package_name_sanitized.clone(),
             doc_path: doc_path.clone(),
@@ -85,15 +85,20 @@ fn serve_docs(req: Request<Body>) -> ResponseFuture {
                 .unwrap(),
         )),
         (&Method::GET, path) => {
-            eprintln!("{:?}", info);
-            let full_path  = info.doc_path.join(&make_index(&make_relative(path)));
-            eprintln!("GET {:?}", full_path);
+            let full_path = info.doc_path.join(&make_index(&make_relative(path)));
+            let mime_type = format!("{}", mime_guess::guess_mime_type(&full_path));
             Box::new(
                 tokio_fs::file::File::open(full_path)
                     .and_then(|file| {
                         let buf: Vec<u8> = Vec::new();
                         tokio_io::io::read_to_end(file, buf)
-                            .and_then(|item| Ok(Response::new(item.1.into())))
+                            .and_then(move |item| {
+                                Ok(Response::builder()
+                                    .status(200)
+                                    .header("Content-Type", mime_type.as_str())
+                                    .body(item.1.into())
+                                    .unwrap())
+                            })
                             .or_else(|_| {
                                 Ok(Response::builder()
                                     .status(StatusCode::INTERNAL_SERVER_ERROR)
