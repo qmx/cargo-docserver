@@ -4,7 +4,7 @@ This is just the result of me fooling around with what would be the minimal HTTP
 
 ## usage:
 
-cargo docserver -p <port>
+`cargo docserver -p <port>`
 
 
 ### sidenote
