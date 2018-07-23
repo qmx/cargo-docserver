@@ -9,4 +9,6 @@ cargo docserver -p <port>
 
 ### sidenote
 
-I've tried really hard to find a simple embeddable rust static file server, if you happen to stumble into one, let me know!
+I've tried really hard to find a simple embeddable rust static file server, and found several, not necessarily fitting the bill here. The closest one was [static-server](https://github.com/DenisKolodin/static-server) but it loads everything in memory :(
+
+if you happen to stumble into one, let me know! happy to ditch my hacky http server :P
