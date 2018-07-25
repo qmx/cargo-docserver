@@ -1,6 +1,6 @@
 [package]
 name = "cargo-docserver"
-version = "0.1.1-alpha.0"
+version = "0.1.1"
 authors = ["Douglas Campos <qmx@qmx.me>"]
 description = "starts an embedded http server for your cargo doc output"
 homepage = "https://github.com/qmx/cargo-docserver"
