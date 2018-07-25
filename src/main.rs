@@ -80,7 +80,7 @@ fn serve_docs(req: Request<Body>) -> ResponseFuture {
         (&Method::GET, "/") => Box::new(future::ok(
             Response::builder()
                 .status(302)
-                .header("Location", format!("/{}", &info.name).as_str())
+                .header("Location", format!("/{}/index.html", &info.name).as_str())
                 .body(Body::empty())
                 .unwrap(),
         )),
