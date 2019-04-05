@@ -1,4 +1,3 @@
-#[macro_use]
 extern crate structopt;
 
 extern crate cargo_metadata;
@@ -62,7 +61,7 @@ fn test_make_root_document() {
 }
 
 fn make_index(path: &str) -> String {
-    let sanitized_path = path.trim_right_matches("/");
+    let sanitized_path = path.trim_end_matches("/");
     if sanitized_path.contains(".") {
         sanitized_path.to_string()
     } else {
@@ -71,7 +70,7 @@ fn make_index(path: &str) -> String {
 }
 
 fn make_relative(path: &str) -> String {
-    path.trim_left_matches("/").to_string()
+    path.trim_start_matches("/").to_string()
 }
 
 fn serve_docs(req: Request<Body>) -> ResponseFuture {
