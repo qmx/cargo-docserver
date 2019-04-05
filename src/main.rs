@@ -18,7 +18,7 @@ use structopt::StructOpt;
 use futures::{future, Future};
 
 #[derive(Debug, StructOpt)]
-#[structopt(name = "cargo")]
+#[structopt(bin_name = "cargo")]
 enum Cargo {
     #[structopt(name = "docserver")]
     Docserver {
