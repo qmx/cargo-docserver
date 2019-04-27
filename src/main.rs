@@ -12,6 +12,7 @@ use hyper::{Body, Method, Request, Response, Server, StatusCode};
 use std::io;
 use std::path::{Path, PathBuf};
 use std::str;
+use std::thread;
 use structopt::StructOpt;
 
 use futures::{future, Future};
@@ -23,6 +24,10 @@ enum Cargo {
     Docserver {
         #[structopt(short = "p", long = "port", default_value = "4000")]
         port: u16,
+
+        #[structopt(long, short, allow_hyphen_values = true)]
+        /// The arguments that will be sent to `cargo doc` when recompiling the docs.
+        recompile_args: Option<String>,
     },
 }
 
@@ -127,9 +132,51 @@ fn not_found() -> ResponseFuture {
     ))
 }
 
+fn setup_recompilation_watcher(recompile_args: Option<String>) {
+    thread::spawn(move || {
+        let recompile_args = into_command_args(&recompile_args);
+        let mut input = String::new();
+
+        println!("Press ENTER to recompile the docs");
+        loop {
+            match io::stdin().read_line(&mut input) {
+                Ok(_) => {
+                    compile_docs(&recompile_args);
+                }
+                Err(error) => eprintln!("Error reading from stdin: {}", error),
+            }
+        }
+    });
+}
+
+fn into_command_args(args: &Option<String>) -> Vec<&str> {
+    match args.as_ref() {
+        Some(args) => args.split(' ').collect(),
+        None => Vec::new(),
+    }
+}
+
+fn compile_docs(recompile_args: &[&str]) {
+    use std::process::Command;
+
+    println!(
+        "Compiling docs with `cargo doc {}`",
+        recompile_args.join(" ")
+    );
+
+    Command::new("cargo")
+        .args(&["doc"])
+        .args(recompile_args)
+        .spawn()
+        .expect("failed to compile docs");
+}
+
 fn main() {
     match Cargo::from_args() {
-        Cargo::Docserver { port } => {
+        Cargo::Docserver {
+            port,
+            recompile_args,
+        } => {
             let addr = ([0, 0, 0, 0], port).into();
             let svc = || service_fn(serve_docs);
             let server = Server::bind(&addr)
@@ -137,6 +184,7 @@ fn main() {
                 .map_err(|e| eprintln!("server error {}", e));
 
             println!("Listening on http://{}", addr);
+            setup_recompilation_watcher(recompile_args);
             hyper::rt::run(server);
         }
     }

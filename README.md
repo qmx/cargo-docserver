@@ -6,6 +6,8 @@ This is just the result of me fooling around with what would be the minimal HTTP
 
 `cargo docserver -p <port>`
 
+Additionally you can compile the docs while the server is running by pressing ENTER. You can pass arguments to `cargo doc` with `-r "--some-arg"`. For example `cargo docserver -r "--no-deps -j 2"`
+
 
 ### sidenote
 
