@@ -164,11 +164,13 @@ fn compile_docs(recompile_args: &[&str]) {
         recompile_args.join(" ")
     );
 
-    Command::new("cargo")
+    let mut child = Command::new("cargo")
         .args(&["doc"])
         .args(recompile_args)
         .spawn()
         .expect("failed to compile docs");
+
+    child.wait().expect("failed to compile docs");
 }
 
 fn main() {
