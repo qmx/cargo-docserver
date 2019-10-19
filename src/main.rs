@@ -1,18 +1,9 @@
-extern crate structopt;
-
-extern crate cargo_metadata;
-extern crate hyper;
-
-extern crate futures;
-extern crate mime_guess;
-extern crate tokio_fs;
-extern crate tokio_io;
-use hyper::service::service_fn;
-use hyper::{Body, Method, Request, Response, Server, StatusCode};
-use std::io;
-use std::path::{Path, PathBuf};
-use std::str;
-use std::thread;
+use hyper::{service::service_fn, Body, Method, Request, Response, Server, StatusCode};
+use std::{
+    io,
+    path::{Path, PathBuf},
+    str, thread,
+};
 use structopt::StructOpt;
 
 use futures::{future, Future};
@@ -31,7 +22,7 @@ enum Cargo {
     },
 }
 
-type ResponseFuture = Box<Future<Item = Response<Body>, Error = io::Error> + Send>;
+type ResponseFuture = Box<dyn Future<Item = Response<Body>, Error = io::Error> + Send>;
 
 #[derive(Debug)]
 struct CrateInfo {
@@ -45,29 +36,18 @@ impl CrateInfo {
         let package_name = &meta.packages[0].name;
         let package_name_sanitized = str::replace(&package_name, "-", "_");
         let doc_path = Path::new(&meta.target_directory).join("doc");
+
         CrateInfo {
-            name: package_name_sanitized.clone(),
-            doc_path: doc_path.clone(),
+            name: package_name_sanitized,
+            doc_path,
         }
     }
 }
 
-#[test]
-fn test_make_relative() {
-    assert_eq!("foo/bar/baz", make_relative("/foo/bar/baz"));
-    assert_eq!("foo/bar/baz", make_relative("///foo/bar/baz"));
-}
-
-#[test]
-fn test_make_root_document() {
-    assert_eq!("/foo/hello/index.html", make_index("/foo/hello"));
-    assert_eq!("/foo/hello/index.html", make_index("/foo/hello/"));
-    assert_eq!("/foo/hello.foo", make_index("/foo/hello.foo"));
-}
-
 fn make_index(path: &str) -> String {
-    let sanitized_path = path.trim_end_matches("/");
-    if sanitized_path.contains(".") {
+    let sanitized_path = path.trim_end_matches('/');
+
+    if sanitized_path.contains('.') {
         sanitized_path.to_string()
     } else {
         format!("{}/index.html", sanitized_path)
@@ -75,7 +55,7 @@ fn make_index(path: &str) -> String {
 }
 
 fn make_relative(path: &str) -> String {
-    path.trim_start_matches("/").to_string()
+    path.trim_start_matches('/').to_string()
 }
 
 fn serve_docs(req: Request<Body>) -> ResponseFuture {
@@ -189,5 +169,24 @@ fn main() {
             setup_recompilation_watcher(recompile_args);
             hyper::rt::run(server);
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    #[allow(unused_imports)]
+    use super::*;
+
+    #[test]
+    fn test_make_relative() {
+        assert_eq!("foo/bar/baz", make_relative("/foo/bar/baz"));
+        assert_eq!("foo/bar/baz", make_relative("///foo/bar/baz"));
+    }
+
+    #[test]
+    fn test_make_root_document() {
+        assert_eq!("/foo/hello/index.html", make_index("/foo/hello"));
+        assert_eq!("/foo/hello/index.html", make_index("/foo/hello/"));
+        assert_eq!("/foo/hello.foo", make_index("/foo/hello.foo"));
     }
 }

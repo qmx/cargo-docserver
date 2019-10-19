@@ -6,6 +6,7 @@ description = "starts an embedded http server for your cargo doc output"
 homepage = "https://github.com/qmx/cargo-docserver"
 repository = "https://github.com/qmx/cargo-docserver"
 license = "MIT/Apache-2.0"
+edition = "2018"
 
 [dependencies]
 structopt = "0.2.15"
