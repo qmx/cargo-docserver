@@ -2,6 +2,7 @@ use hyper::{service::service_fn, Body, Method, Request, Response, Server, Status
 use std::{
     io,
     path::{Path, PathBuf},
+    process::Command,
     str, thread,
 };
 use structopt::StructOpt;
@@ -114,7 +115,6 @@ fn not_found() -> ResponseFuture {
 
 fn setup_recompilation_watcher(recompile_args: Option<String>) {
     thread::spawn(move || {
-        let recompile_args = into_command_args(&recompile_args);
         let mut input = String::new();
 
         println!("Press ENTER to recompile the docs");
@@ -129,15 +129,8 @@ fn setup_recompilation_watcher(recompile_args: Option<String>) {
     });
 }
 
-fn into_command_args(args: &Option<String>) -> Vec<&str> {
-    match args.as_ref() {
-        Some(args) => args.split(' ').collect(),
-        None => Vec::new(),
-    }
-}
-
-fn compile_docs(recompile_args: &[&str]) {
-    use std::process::Command;
+fn compile_docs(recompile_args: &Option<String>) {
+    let recompile_args = into_command_args(&recompile_args);
 
     println!(
         "Compiling docs with `cargo doc {}`",
@@ -153,6 +146,13 @@ fn compile_docs(recompile_args: &[&str]) {
     child.wait().expect("failed to compile docs");
 }
 
+fn into_command_args(args: &Option<String>) -> Vec<&str> {
+    match args.as_ref() {
+        Some(args) => args.split(' ').collect(),
+        None => Vec::new(),
+    }
+}
+
 fn main() {
     match Cargo::from_args() {
         Cargo::Docserver {
@@ -165,8 +165,10 @@ fn main() {
                 .serve(svc)
                 .map_err(|e| eprintln!("server error {}", e));
 
-            println!("Listening on http://{}", addr);
+            compile_docs(&recompile_args);
             setup_recompilation_watcher(recompile_args);
+
+            println!("Listening on http://{}", addr);
             hyper::rt::run(server);
         }
     }
