@@ -74,17 +74,19 @@ fn make_relative(path: &str) -> String {
 }
 
 fn serve_docs(req: Request<Body>) -> ResponseFuture {
-    let info = CrateInfo::parse();
+    lazy_static::lazy_static! {
+        static ref INFO: CrateInfo = CrateInfo::parse();
+    }
     match (req.method(), req.uri().path()) {
         (&Method::GET, "/") => Box::new(future::ok(
             Response::builder()
                 .status(302)
-                .header("Location", format!("/{}/index.html", &info.name).as_str())
+                .header("Location", format!("/{}/index.html", &INFO.name).as_str())
                 .body(Body::empty())
                 .unwrap(),
         )),
         (&Method::GET, path) => {
-            let full_path = info.doc_path.join(&make_index(&make_relative(path)));
+            let full_path = INFO.doc_path.join(&make_index(&make_relative(path)));
             let mime_type = format!("{}", mime_guess::guess_mime_type(&full_path));
             Box::new(
                 tokio_fs::file::File::open(full_path)
