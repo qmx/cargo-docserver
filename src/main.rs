@@ -38,7 +38,7 @@ impl CrateInfo {
     fn parse() -> CrateInfo {
         let meta = cargo_metadata::metadata(None).unwrap();
         let package_name = &meta.packages[0].name;
-        let package_name_sanitized = str::replace(&package_name, "-", "_");
+        let package_name_sanitized = str::replace(&package_name, "-", "_").to_lowercase();
         let doc_path = Path::new(&meta.target_directory).join("doc");
         CrateInfo {
             name: package_name_sanitized.clone(),
