@@ -37,7 +37,7 @@ struct CrateInfo {
 impl CrateInfo {
     fn parse() -> CrateInfo {
         let meta = cargo_metadata::metadata(None).unwrap();
-        let package_name = &meta.packages[0].name;
+        let package_name = &meta.packages[0].targets[0].name;
         let package_name_sanitized = str::replace(&package_name, "-", "_");
         let doc_path = Path::new(&meta.target_directory).join("doc");
         CrateInfo {
