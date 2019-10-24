@@ -172,7 +172,11 @@ mod tests {
 
         let manifest_path = crate_path.join("Cargo.toml");
 
-        let config = Config::default().expect("Unable to get default config");
+        let mut config = Config::default().expect("Unable to get default config");
+        config
+            // ensure the commands are run without producing output to stdout or stderr
+            .configure(0, Some(true), &None, false, false, true, &None, &[])
+            .expect("Unable to configure cargo commands");
         let workspace =
             Workspace::new(&manifest_path, &config).expect("Unable to create workspace");
 
