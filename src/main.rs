@@ -7,6 +7,13 @@ extern crate futures;
 extern crate mime_guess;
 extern crate tokio_fs;
 extern crate tokio_io;
+
+#[cfg(test)]
+extern crate cargo;
+
+#[cfg(test)]
+extern crate scopeguard;
+
 use hyper::service::service_fn;
 use hyper::{Body, Method, Request, Response, Server, StatusCode};
 use std::io;
@@ -35,9 +42,14 @@ struct CrateInfo {
 }
 
 impl CrateInfo {
-    fn parse() -> CrateInfo {
-        let meta = cargo_metadata::metadata(None).unwrap();
-        let package_name = &meta.packages[0].name;
+    fn parse(path_opt: Option<PathBuf>) -> CrateInfo {
+        let mut cmd = cargo_metadata::MetadataCommand::new();
+        if let Some(path) = path_opt {
+            cmd.manifest_path(path);
+        }
+        let meta = cmd.exec().unwrap();
+
+        let package_name = &meta.packages[0].targets[0].name;
         let package_name_sanitized = str::replace(&package_name, "-", "_");
         let doc_path = Path::new(&meta.target_directory).join("doc");
         CrateInfo {
@@ -74,7 +86,7 @@ fn make_relative(path: &str) -> String {
 }
 
 fn serve_docs(req: Request<Body>) -> ResponseFuture {
-    let info = CrateInfo::parse();
+    let info = CrateInfo::parse(None);
     match (req.method(), req.uri().path()) {
         (&Method::GET, "/") => Box::new(future::ok(
             Response::builder()
@@ -139,5 +151,80 @@ fn main() {
             println!("Listening on http://{}", addr);
             hyper::rt::run(server);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+
+    use cargo::core::compiler::CompileMode;
+    use cargo::core::Workspace;
+    use cargo::ops::CleanOptions;
+    use cargo::ops::CompileOptions;
+    use cargo::ops::DocOptions;
+    use cargo::util::config::Config;
+    use std::path::Path;
+
+    fn check_asset_crate(name: &str) {
+        let crate_path = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("assets")
+            .join(name);
+
+        let manifest_path = crate_path.join("Cargo.toml");
+
+        let mut config = Config::default().expect("Unable to get default config");
+        config
+            // ensure the commands are run without producing output to stdout or stderr
+            .configure(0, Some(true), &None, false, false, true, &None, &[])
+            .expect("Unable to configure cargo commands");
+        let workspace =
+            Workspace::new(&manifest_path, &config).expect("Unable to create workspace");
+
+        // Use defer to ensure that the command is ran when exiting the function (no matter if
+        // pandic or not)
+        scopeguard::defer! {{
+            if let Err(e) = cargo::ops::clean(
+                &workspace,
+                &CleanOptions {
+                    config: &config,
+                    spec: Vec::new(),
+                    target: None,
+                    release: false,
+                    doc: false,
+                },
+            ) {
+                eprintln!("Unable to clean target directory: {}", e);
+            }
+        }};
+
+        let compile_opts = CompileOptions::new(&config, CompileMode::Doc { deps: false })
+            .expect("Unable to create compile options");
+        cargo::ops::doc(
+            &workspace,
+            &DocOptions {
+                open_result: false,
+                compile_opts,
+            },
+        )
+        .expect("Unable to generate docs");
+
+        let info = super::CrateInfo::parse(Some(manifest_path));
+        let doc_path = Path::new(&info.doc_path);
+        assert!(doc_path.is_dir(), "Path to docs is a directory");
+        assert!(doc_path.join(&info.name).is_dir(), "Path to crate in docs");
+        assert!(
+            doc_path.join(&info.name).join("index.html").is_file(),
+            "Path to index of crate in docs"
+        );
+    }
+
+    #[test]
+    fn correct_name_my_crate() {
+        check_asset_crate("my-crate");
+    }
+
+    #[test]
+    fn correct_name_your_crate() {
+        check_asset_crate("your-crate");
     }
 }
