@@ -33,7 +33,7 @@ enum Cargo {
     },
 }
 
-type ResponseFuture = Box<Future<Item = Response<Body>, Error = io::Error> + Send>;
+type ResponseFuture = Box<dyn Future<Item = Response<Body>, Error = io::Error> + Send>;
 
 #[derive(Debug)]
 struct CrateInfo {
