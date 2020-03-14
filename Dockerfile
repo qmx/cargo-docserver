@@ -1,7 +1,8 @@
-FROM qmxme/rust-builder:0.1.0 as builder
-ENV CARGO_INSTALL_ROOT /opt/rust-tools
-ADD . /crate
-RUN cargo install --path /crate
+FROM qmxme/curl as builder
+ARG TARGETARCH
+ARG TARGETVARIANT
+ARG REF
+RUN curl -o /usr/local/bin/cargo-docserver -L https://github.com/qmx/cargo-docserver/releases/download/$REF/cargo-docserver-linux-$TARGETARCH$TARGETVARIANT
 
 FROM alpine:3.11
-COPY --from=builder /opt/rust-tools/bin/* /opt/rust-tools/bin/
+COPY --from=builder /usr/local/bin/* /opt/rust-tools/bin/
