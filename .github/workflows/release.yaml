@@ -1,0 +1,111 @@
+name: release
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build:
+    name: build
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        arch: [x86_64, armv7]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v1
+
+      - name: Install Rust toolchain
+        uses: qmx/toolchain@multi-target
+        with:
+          toolchain: stable
+          profile: minimal
+          targets: x86_64-unknown-linux-musl, armv7-unknown-linux-musleabihf
+          override: true
+
+      - name: Build x86_64
+        if: matrix.arch == 'x86_64'
+        uses: actions-rs/cargo@v1
+        env:
+          CC: clang
+          RUSTFLAGS: "-C linker=rust-lld -C linker-flavor=ld.lld"
+        with:
+          command: build
+          args: --release --target x86_64-unknown-linux-musl
+
+      - name: Build ARMv7
+        if: matrix.arch == 'armv7'
+        uses: actions-rs/cargo@v1
+        env:
+          CC: clang
+          RUSTFLAGS: "-C linker=rust-lld -C linker-flavor=ld.lld"
+        with:
+          command: build
+          args: --release --target armv7-unknown-linux-musleabihf
+
+      - name: Create distribution dir
+        run: mkdir ./dist
+
+      - name: Copy x86_64 binary
+        if: matrix.arch == 'x86_64'
+        run: cp ./target/x86_64-unknown-linux-musl/release/cargo-docserver ./dist/cargo-docserver-linux-x86_64
+
+      - name: Copy ARMv7 binary
+        if: matrix.arch == 'armv7'
+        run: cp ./target/armv7-unknown-linux-musleabihf/release/cargo-docserver ./dist/cargo-docserver-linux-armv7
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v1
+        with:
+          name: build-linux-${{ matrix.arch }}
+          path: ./dist
+
+  make-release:
+    name: make-release
+    runs-on: ubuntu-latest
+    needs: ['build']
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v1
+
+      - uses: actions/download-artifact@v1
+        with:
+          name: build-linux-x86_64
+          path: dist
+
+      - uses: actions/download-artifact@v1
+        with:
+          name: build-linux-armv7
+          path: dist
+
+      - run: ls -all ./dist
+
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref }}
+          release_name: ${{ github.ref }}
+          draft: false
+          prerelease: false
+
+      - uses: actions/upload-release-asset@v1.0.1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./dist/cargo-docserver-linux-x86_64
+          asset_name: cargo-docserver-linux-x86_64
+          asset_content_type: application/octet-stream
+
+      - uses: actions/upload-release-asset@v1.0.1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./dist/cargo-docserver-linux-armv7
+          asset_name: cargo-docserver-linux-armv7
+          asset_content_type: application/octet-stream
+
