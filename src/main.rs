@@ -49,7 +49,7 @@ impl CrateInfo {
         }
         let meta = cmd.exec().unwrap();
 
-        let package_name = &meta.packages[0].targets[0].name;
+        let package_name = &meta.root_package().unwrap().targets[0].name;
         let package_name_sanitized = str::replace(&package_name, "-", "_");
         let doc_path = Path::new(&meta.target_directory).join("doc");
         CrateInfo {
@@ -175,7 +175,7 @@ mod tests {
         let mut config = Config::default().expect("Unable to get default config");
         config
             // ensure the commands are run without producing output to stdout or stderr
-            .configure(0, Some(true), &None, false, false, true, &None, &[])
+            .configure(0, true, None, false, false, true, &None, &[], &[])
             .expect("Unable to configure cargo commands");
         let workspace =
             Workspace::new(&manifest_path, &config).expect("Unable to create workspace");
@@ -188,8 +188,9 @@ mod tests {
                 &CleanOptions {
                     config: &config,
                     spec: Vec::new(),
-                    target: None,
-                    release: false,
+                    targets: vec![],
+                    profile_specified: false,
+                    requested_profile: "".into(),
                     doc: false,
                 },
             ) {
