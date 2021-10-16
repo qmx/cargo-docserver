@@ -30,6 +30,8 @@ enum Cargo {
     Docserver {
         #[structopt(short = "p", long = "port", default_value = "4000")]
         port: u16,
+        #[structopt(long = "target")]
+        target: Option<String>
     },
 }
 
@@ -42,7 +44,7 @@ struct CrateInfo {
 }
 
 impl CrateInfo {
-    fn parse(path_opt: Option<PathBuf>) -> CrateInfo {
+    fn parse(path_opt: Option<PathBuf>, target: Option<&str>) -> CrateInfo {
         let mut cmd = cargo_metadata::MetadataCommand::new();
         if let Some(path) = path_opt {
             cmd.manifest_path(path);
@@ -51,7 +53,9 @@ impl CrateInfo {
 
         let package_name = &meta.packages[0].targets[0].name;
         let package_name_sanitized = str::replace(&package_name, "-", "_");
-        let doc_path = Path::new(&meta.target_directory).join("doc");
+        let doc_path = Path::new(&meta.target_directory)
+            .join(target.unwrap_or("."))
+            .join("doc");
         CrateInfo {
             name: package_name_sanitized.clone(),
             doc_path: doc_path.clone(),
@@ -85,8 +89,8 @@ fn make_relative(path: &str) -> String {
     path.trim_start_matches("/").to_string()
 }
 
-fn serve_docs(req: Request<Body>) -> ResponseFuture {
-    let info = CrateInfo::parse(None);
+fn serve_docs(req: Request<Body>, target: Option<&str>) -> ResponseFuture {
+    let info = CrateInfo::parse(None, target);
     match (req.method(), req.uri().path()) {
         (&Method::GET, "/") => Box::new(future::ok(
             Response::builder()
@@ -141,9 +145,14 @@ fn not_found() -> ResponseFuture {
 
 fn main() {
     match Cargo::from_args() {
-        Cargo::Docserver { port } => {
+        Cargo::Docserver { port, target } => {
             let addr = ([0, 0, 0, 0], port).into();
-            let svc = || service_fn(serve_docs);
+            let svc = move || {
+                let target2 = target.clone();
+                service_fn(move |req: Request<Body>| {
+                    serve_docs(req, target2.as_ref().map(String::as_str))
+                })
+            };
             let server = Server::bind(&addr)
                 .serve(svc)
                 .map_err(|e| eprintln!("server error {}", e));
@@ -188,7 +197,7 @@ mod tests {
                 &CleanOptions {
                     config: &config,
                     spec: Vec::new(),
-                    target: None,
+                    target,
                     release: false,
                     doc: false,
                 },
@@ -208,7 +217,7 @@ mod tests {
         )
         .expect("Unable to generate docs");
 
-        let info = super::CrateInfo::parse(Some(manifest_path));
+        let info = super::CrateInfo::parse(Some(manifest_path), None);
         let doc_path = Path::new(&info.doc_path);
         assert!(doc_path.is_dir(), "Path to docs is a directory");
         assert!(doc_path.join(&info.name).is_dir(), "Path to crate in docs");
