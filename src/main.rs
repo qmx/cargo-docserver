@@ -65,22 +65,6 @@ fn test_make_relative() {
     assert_eq!("foo/bar/baz", make_relative("///foo/bar/baz"));
 }
 
-#[test]
-fn test_make_root_document() {
-    assert_eq!("/foo/hello/index.html", make_index("/foo/hello"));
-    assert_eq!("/foo/hello/index.html", make_index("/foo/hello/"));
-    assert_eq!("/foo/hello.foo", make_index("/foo/hello.foo"));
-}
-
-fn make_index(path: &str) -> String {
-    let sanitized_path = path.trim_end_matches("/");
-    if sanitized_path.contains(".") {
-        sanitized_path.to_string()
-    } else {
-        format!("{}/index.html", sanitized_path)
-    }
-}
-
 fn make_relative(path: &str) -> String {
     path.trim_start_matches("/").to_string()
 }
@@ -96,34 +80,50 @@ fn serve_docs(req: Request<Body>) -> ResponseFuture {
                 .unwrap(),
         )),
         (&Method::GET, path) => {
-            let full_path = info.doc_path.join(&make_index(&make_relative(path)));
-            let mime_type = format!("{}", mime_guess::guess_mime_type(&full_path));
+            let relpath = make_relative(path);
+            let full_path = info.doc_path.join(&relpath);
+            let full_path2 = full_path.clone();
             Box::new(
-                tokio_fs::file::File::open(full_path)
-                    .and_then(|file| {
-                        let buf: Vec<u8> = Vec::new();
-                        tokio_io::io::read_to_end(file, buf)
-                            .and_then(move |item| {
-                                Ok(Response::builder()
-                                    .status(200)
-                                    .header("Content-Type", mime_type.as_str())
-                                    .body(item.1.into())
-                                    .unwrap())
+            tokio_fs::metadata(full_path)
+            .and_then(move |metadata| {
+                if metadata.is_dir() {
+                    Box::new(future::ok(
+                        Response::builder()
+                            .status(302)
+                            .header("Location", format!("/{}/index.html", relpath))
+                            .body(Body::empty())
+                            .unwrap()
+                    )) as Box<dyn Future<Item = _, Error = _> + Send>
+                } else {
+                    let mime_type = format!("{}", mime_guess::guess_mime_type(&full_path2));
+                    Box::new(
+                        tokio_fs::file::File::open(full_path2)
+                            .and_then(|file| {
+                                let buf: Vec<u8> = Vec::new();
+                                tokio_io::io::read_to_end(file, buf)
+                                    .and_then(move |item| {
+                                        Ok(Response::builder()
+                                            .status(200)
+                                            .header("Content-Type", mime_type.as_str())
+                                            .body(item.1.into())
+                                            .unwrap())
+                                    })
+                                    .or_else(|_| {
+                                        Ok(Response::builder()
+                                            .status(StatusCode::INTERNAL_SERVER_ERROR)
+                                            .body(Body::empty())
+                                            .unwrap())
+                                    })
                             })
                             .or_else(|_| {
                                 Ok(Response::builder()
-                                    .status(StatusCode::INTERNAL_SERVER_ERROR)
-                                    .body(Body::empty())
+                                    .status(StatusCode::NOT_FOUND)
+                                    .body("not found".into())
                                     .unwrap())
-                            })
-                    })
-                    .or_else(|_| {
-                        Ok(Response::builder()
-                            .status(StatusCode::NOT_FOUND)
-                            .body("not found".into())
-                            .unwrap())
-                    }),
-            )
+                            }),
+                    ) as Box<dyn Future<Item = _, Error = _> + Send>
+                }
+            }))
         }
 
         _ => not_found(),
